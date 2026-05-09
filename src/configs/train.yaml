@@ -16,8 +16,15 @@ lr_scheduler:
   gamma: 0.9
   step_size: ${trainer.epoch_len}
 
-loss_function:
-  _target_: src.loss.ExampleLoss
+generator_loss_function:
+  _target_: src.loss.GeneratorLoss
+  lambda_adversarial: 1
+  lambda_feature: 100
+  lambda_reconstruction: 1
+  lambda_commitment: 1
+
+descriminator_loss_function:
+  _target_: src.loss.AdversarialLoss
 
 trainer:
   log_step: 50

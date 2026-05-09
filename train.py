@@ -40,11 +40,12 @@ def main(config):
 
     # # build model architecture, then print to console
     model = instantiate(config.model)
-    print(model)
     # logger.info(model)
 
     # # get function handles of loss and metrics
-    # loss_function = instantiate(config.loss_function).to(device)
+    generator_loss_function = instantiate(config.generator_loss_function).to(device)
+    descriminator_loss_function = instantiate(config.descriminator_loss_function).to(device)
+
     # metrics = instantiate(config.metrics)
 
     # # build optimizer, learning rate scheduler

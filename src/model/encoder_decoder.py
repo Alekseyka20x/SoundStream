@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 from collections.abc import Sequence
 
 
@@ -21,7 +22,7 @@ class CausalConv1d(nn.Module):
             dilation=dilation
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         x = nn.functional.pad(x, (self.padding, 0), "constant", 0)
         return self.conv(x)
 
@@ -43,13 +44,13 @@ class CausalConvTranspose1d(nn.Module):
             stride=stride
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         x = self.conv(x)
         return x[..., :-self.cut_last]
 
 
 class ResidualUnit(nn.Module):
-    def __init__(self, N, dilation):
+    def __init__(self, N: int, dilation: int):
         super().__init__()
         self.net = nn.Sequential(
             nn.ELU(),
@@ -58,12 +59,12 @@ class ResidualUnit(nn.Module):
             CausalConv1d(kernel_size=1, in_channels=N, out_channels=N)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return x + self.net(x)
 
 
 class EncoderBlock(nn.Module):
-    def __init__(self, N, S):
+    def __init__(self, N: int, S: int):
         super().__init__()
         self.net = nn.Sequential(
             ResidualUnit(N // 2, dilation=1),
@@ -73,7 +74,7 @@ class EncoderBlock(nn.Module):
             CausalConv1d(kernel_size=2*S, in_channels=N // 2, out_channels=N, stride=S)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return self.net(x)
 
 
@@ -94,14 +95,14 @@ class Encoder(nn.Module):
             CausalConv1d(kernel_size=3, in_channels=C, out_channels=out_channels)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return {
-            "logits": self.net(x)
+            "embeddings": self.net(x)
         }
 
 
 class DecoderBlock(nn.Module):
-    def __init__(self, N, S):
+    def __init__(self, N: int, S: int):
         super().__init__()
         self.net = nn.Sequential(
             nn.ELU(),
@@ -111,7 +112,7 @@ class DecoderBlock(nn.Module):
             ResidualUnit(N, dilation=9)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return self.net(x)
 
 
@@ -132,7 +133,7 @@ class Decoder(nn.Module):
             CausalConv1d(kernel_size=7, in_channels=C, out_channels=1)
         )
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         return {
-            "logits": self.net(x)
+            "reconstruction": self.net(x)
         }

@@ -13,9 +13,9 @@ class SoundStream(nn.Module):
         self.decoder = decoder
     
     def forward(self, x):
-        embeddings = self.encoder(x)
+        embeddings = self.encoder(x)["embeddings"]
         quantized_embeddings = self.rvq(embeddings)["quantized_embeddings"]
-        reconstruction = self.decoder(quantized_embeddings)
+        reconstruction = self.decoder(quantized_embeddings)["reconstruction"]
         return {
             "embeddings": embeddings,
             "quantized_embeddings": quantized_embeddings,
