@@ -2,6 +2,13 @@ import torch
 from torch import nn
 
 
+class AdversarialLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, descriminator_logits: torch.Tensor, labels: torch.Tensor, **batch):
+        
+
 class ExampleLoss(nn.Module):
     """
     Example of a loss function to use.

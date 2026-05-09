@@ -25,6 +25,7 @@ class CausalConv1d(nn.Module):
         x = nn.functional.pad(x, (self.padding, 0), "constant", 0)
         return self.conv(x)
 
+
 class CausalConvTranspose1d(nn.Module):
     def __init__(
         self,
