@@ -1,5 +1,5 @@
 _target_: src.logger.CometMLWriter
-project_name: "pytorch_template"
+project_name: "dl-hw4-soundstream"
 workspace: null
 run_name: "testing"
 mode: "online"

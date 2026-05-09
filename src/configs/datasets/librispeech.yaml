@@ -1,0 +1,14 @@
+train:
+  _target_: src.datasets.HFDataset
+  dataset_name: "openslr/librispeech_asr"
+  split: "train.clean.100"
+
+test:
+  _target_: src.datasets.HFDataset
+  dataset_name: "openslr/librispeech_asr"
+  split: "test.clean"
+
+validation:
+  _target_: src.datasets.HFDataset
+  dataset_name: "openslr/librispeech_asr"
+  split: "validation.clean"

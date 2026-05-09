@@ -1,0 +1,15 @@
+_target_: src.model.SoundStream
+encoder:
+  _target_: src.model.Encoder
+  out_channels: 2
+  hidden_channels: 4
+  strides: [2, 4, 5, 5]
+
+rvq:
+  _target_: src.model.RVQ
+
+decoder:
+  _target_: src.model.Decoder
+  in_channels: 2
+  hidden_channels: 4
+  strides: [2, 4, 5, 5]

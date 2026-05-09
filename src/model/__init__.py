@@ -1,5 +1,1 @@
-from src.model.baseline_model import BaselineModel
-
-__all__ = [
-    "BaselineModel",
-]
+from encoder_decoder import Encoder, Decoder
