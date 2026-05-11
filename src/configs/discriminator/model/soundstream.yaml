@@ -1,1 +1,13 @@
-_target_: src.model.Discriminators
+_target_: src.models.discriminator.Discriminator
+
+wave_discriminator:
+  _target_: src.models.discriminator.WaveDiscriminator
+  n_wave_discriminators: 3
+  slope: 0.2
+
+stft_discriminator:
+  _target_: src.models.discriminator.STFTDiscriminator
+  hidden_channels: 32
+  window_length: 1024
+  hop_length: 256
+  slope: 0.2

@@ -21,8 +21,8 @@ class GanTrainer(BaseTrainer):
             batch.update(G_output)
 
             # Disctiminator update
-            D_output_fake_detached = self.D.model(fake_data.detach(), mode="fake")
-            D_output_real = self.D.model(real_data, mode="real")
+            D_output_fake_detached = self.D.model(fake_data.detach())
+            D_output_real = self.D.model(real_data)
             D_loss = self.D.loss_function(
                 discriminator_output_real=D_output_real,
                 discriminator_output_fake=D_output_fake_detached,
@@ -40,7 +40,7 @@ class GanTrainer(BaseTrainer):
             self.D.optimizer.step()
 
             # Generator update
-            D_output_fake = self.D.model(fake_data, mode="fake")
+            D_output_fake = self.D.model(fake_data)
             batch.update({"discriminator_output_fake": D_output_fake})
             G_losses = self.G.loss_function(**batch)
             G_loss = G_losses["loss"]

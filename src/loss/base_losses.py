@@ -36,7 +36,7 @@ class FeatureLoss(nn.Module):
         K = len(discriminator_output_real) - 1
         loss = 0
         for disc_label in discriminator_output_real.keys():
-            features_real = discriminator_output_real[disc_label]["features"]
+            features_real = discriminator_output_real[disc_label]["features"].detach()
             features_fake = discriminator_output_fake[disc_label]["features"]
             for feature_real, feature_fake in zip(features_real, features_fake):
                 loss += torch.abs(feature_real - feature_fake).mean(axis=-1)
