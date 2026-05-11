@@ -1,6 +1,7 @@
-import torch.nn as nn
-import torch
 from collections.abc import Sequence
+
+import torch
+import torch.nn as nn
 
 
 class CausalConv1d(nn.Module):
@@ -10,7 +11,7 @@ class CausalConv1d(nn.Module):
         out_channels: int,
         kernel_size: int,
         stride: int = 1,
-        dilation: int = 1
+        dilation: int = 1,
     ):
         super().__init__()
         self.padding = (kernel_size - 1) * dilation
@@ -19,9 +20,9 @@ class CausalConv1d(nn.Module):
             out_channels=out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            dilation=dilation
+            dilation=dilation,
         )
-    
+
     def forward(self, x: torch.Tensor):
         x = nn.functional.pad(x, (self.padding, 0), "constant", 0)
         return self.conv(x)
@@ -29,11 +30,7 @@ class CausalConv1d(nn.Module):
 
 class CausalConvTranspose1d(nn.Module):
     def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-        stride: int = 1
+        self, in_channels: int, out_channels: int, kernel_size: int, stride: int = 1
     ):
         super().__init__()
         self.cut_last = kernel_size - stride
@@ -41,12 +38,12 @@ class CausalConvTranspose1d(nn.Module):
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
-            stride=stride
+            stride=stride,
         )
-    
+
     def forward(self, x: torch.Tensor):
         x = self.conv(x)
-        return x[..., :-self.cut_last]
+        return x[..., : -self.cut_last]
 
 
 class ResidualUnit(nn.Module):
@@ -54,11 +51,13 @@ class ResidualUnit(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.ELU(),
-            CausalConv1d(kernel_size=7, in_channels=N, out_channels=N, dilation=dilation),
+            CausalConv1d(
+                kernel_size=7, in_channels=N, out_channels=N, dilation=dilation
+            ),
             nn.ELU(),
-            CausalConv1d(kernel_size=1, in_channels=N, out_channels=N)
+            CausalConv1d(kernel_size=1, in_channels=N, out_channels=N),
         )
-    
+
     def forward(self, x: torch.Tensor):
         return x + self.net(x)
 
@@ -71,9 +70,11 @@ class EncoderBlock(nn.Module):
             ResidualUnit(N // 2, dilation=3),
             ResidualUnit(N // 2, dilation=9),
             nn.ELU(),
-            CausalConv1d(kernel_size=2*S, in_channels=N // 2, out_channels=N, stride=S)
+            CausalConv1d(
+                kernel_size=2 * S, in_channels=N // 2, out_channels=N, stride=S
+            ),
         )
-    
+
     def forward(self, x: torch.Tensor):
         return self.net(x)
 
@@ -94,11 +95,9 @@ class Encoder(nn.Module):
             nn.ELU(),
             CausalConv1d(kernel_size=3, in_channels=C, out_channels=out_channels)
         )
-    
+
     def forward(self, x: torch.Tensor):
-        return {
-            "embeddings": self.net(x)
-        }
+        return {"embeddings": self.net(x)}
 
 
 class DecoderBlock(nn.Module):
@@ -106,12 +105,14 @@ class DecoderBlock(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.ELU(),
-            CausalConvTranspose1d(kernel_size=2*S, in_channels=2*N, out_channels=N, stride=S),
+            CausalConvTranspose1d(
+                kernel_size=2 * S, in_channels=2 * N, out_channels=N, stride=S
+            ),
             ResidualUnit(N, dilation=1),
             ResidualUnit(N, dilation=3),
-            ResidualUnit(N, dilation=9)
+            ResidualUnit(N, dilation=9),
         )
-    
+
     def forward(self, x: torch.Tensor):
         return self.net(x)
 
@@ -127,13 +128,15 @@ class Decoder(nn.Module):
             decoder_blocks.append(EncoderBlock(N=C, S=stride))
 
         self.net = nn.Sequential(
-            CausalConv1d(kernel_size=7, in_channels=in_channels, out_channels=hidden_channels * (2 ** len(strides))),
+            CausalConv1d(
+                kernel_size=7,
+                in_channels=in_channels,
+                out_channels=hidden_channels * (2 ** len(strides)),
+            ),
             *decoder_blocks,
             nn.ELU(),
             CausalConv1d(kernel_size=7, in_channels=C, out_channels=1)
         )
-    
+
     def forward(self, x: torch.Tensor):
-        return {
-            "reconstruction": self.net(x)
-        }
+        return {"reconstruction": self.net(x)}

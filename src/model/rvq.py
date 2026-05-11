@@ -6,10 +6,7 @@ class RVQ(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        return {
-            "quantized_embeddings": ...,
-            "codebook_indices": ...
-        }
+        return {"quantized_embeddings": ..., "codebook_indices": ...}
 
     def decode(self, x):
         return ...

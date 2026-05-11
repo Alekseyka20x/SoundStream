@@ -1,31 +1,48 @@
+from typing import Any, Literal
+
 import torch
 from torch import nn
-from typing import Any
 
 
 class AdversarialLoss(nn.Module):
     def __init__(self):
         super().__init__()
-    
-    def forward(self, descriminator_logits: dict[Any, dict[str, torch.Tensor]], **batch):
-        K = len(descriminator_logits) - 1
+
+    def forward(
+        self,
+        discriminator_output: dict[Any, dict[str, Any]],
+        label: Literal["real", "fake"],
+        **batch
+    ):
+        K = len(discriminator_output) - 1
         loss = 0
-        for obj in descriminator_logits:
-            logits = obj["logits"]
-            labels = obj["labels"]
-            loss += torch.max(1 - labels * logits).mean(axis=-1)
+        for output in discriminator_output.values():
+            logits: torch.Tensor = output["logits"]
+            loss += torch.max(1 - (1 if label == "real" else -1) * logits).mean(axis=-1)
         loss /= K
-        return {
-            "loss": loss.mean()
-        }
+        return {"loss": loss.mean()}
 
 
 class FeatureLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, **batch):
-        ...
+    def forward(
+        self,
+        discriminator_output_real: dict[Any, dict[str, Any]],
+        discriminator_output_fake: dict[Any, dict[str, Any]],
+        **batch
+    ):
+        K = len(discriminator_output_real) - 1
+        loss = 0
+        for disc_label in discriminator_output_real.keys():
+            features_real = discriminator_output_real[disc_label]["features"]
+            features_fake = discriminator_output_fake[disc_label]["features"]
+            for feature_real, feature_fake in zip(features_real, features_fake):
+                loss += torch.abs(feature_real - feature_fake).mean(axis=-1)
+            L = len(features_real)
+        loss /= K * L
+        return {"loss": loss.mean()}
 
 
 class ReconstructionLoss(nn.Module):
@@ -39,8 +56,8 @@ class ReconstructionLoss(nn.Module):
 class CommitmentLoss(nn.Module):
     def __init__(self):
         super().__init__()
-    
-    def forward(embeddings: torch.Tensor, quantized_embeddings: torch.Tensor, **batch):
-        return {
-            "loss": nn.functional.mse_loss(embeddings, quantized_embeddings)
-        }
+
+    def forward(
+        self, embeddings: torch.Tensor, quantized_embeddings: torch.Tensor, **batch
+    ):
+        return {"loss": nn.functional.mse_loss(embeddings, quantized_embeddings)}

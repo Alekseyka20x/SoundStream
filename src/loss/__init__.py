@@ -1,2 +1,2 @@
+from .discriminator_loss import DiscriminatorLoss
 from .generator_loss import GeneratorLoss
-from .base_losses import AdversarialLoss

@@ -1,8 +1,8 @@
-from .rvq import RVQ
-from .encoder_decoder import Encoder, Decoder
-
-import torch.nn as nn
 import torch
+import torch.nn as nn
+
+from .encoder_decoder import Decoder, Encoder
+from .rvq import RVQ
 
 
 class SoundStream(nn.Module):
@@ -11,7 +11,7 @@ class SoundStream(nn.Module):
         self.encoder = encoder
         self.rvq = rvq
         self.decoder = decoder
-    
+
     def forward(self, x):
         embeddings = self.encoder(x)["embeddings"]
         quantized_embeddings = self.rvq(embeddings)["quantized_embeddings"]
@@ -19,13 +19,13 @@ class SoundStream(nn.Module):
         return {
             "embeddings": embeddings,
             "quantized_embeddings": quantized_embeddings,
-            "reconstruction": reconstruction
+            "reconstruction": reconstruction,
         }
 
     @torch.inference_mode()
     def encode(self, x):
         return self.rvq(self.encoder(x))["codebook_indices"]
-    
+
     @torch.inference_mode()
     def decode(self, x):
         return self.decoder(self.rvq.decode(x))

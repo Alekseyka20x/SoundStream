@@ -1,5 +1,6 @@
-from src.datasets.base_dataset import BaseDataset
 from datasets import load_dataset
+from src.datasets.base_dataset import BaseDataset
+
 
 class HFDataset(BaseDataset):
     def __init__(self, dataset_name, split, *args, **kwargs):
