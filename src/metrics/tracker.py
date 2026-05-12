@@ -24,7 +24,7 @@ class MetricTracker:
         Reset all metrics after epoch end.
         """
         for col in self._data.columns:
-            self._data[col].values[:] = 0
+            self._data[col] = 0.0
 
     def update(self, key, value, n=1):
         """
@@ -35,8 +35,8 @@ class MetricTracker:
             value (float): metric value on the batch.
             n (int): how many times to count this value.
         """
-        # if self.writer is not None:
-        #     self.writer.add_scalar(key, value)
+        if key not in self._data.index:
+            self._data.loc[key] = [0.0, 0.0, 0.0]
         self._data.loc[key, "total"] += value * n
         self._data.loc[key, "counts"] += n
         self._data.loc[key, "average"] = self._data.total[key] / self._data.counts[key]

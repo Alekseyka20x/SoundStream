@@ -44,9 +44,9 @@ class GeneratorLoss(nn.Module):
             + self.lambda_commitment * commitment_loss
         )
         return {
-            "adversarial_loss": adversarial_loss.item(),
-            "feature_loss": feature_loss.item(),
-            "reconstruction_loss": reconstruction_loss.item(),
-            "commitment_loss": commitment_loss.item(),
+            "loss_adversarial": adversarial_loss,
+            "loss_feature": feature_loss,
+            "loss_reconstruction": reconstruction_loss,
+            "loss_commitment": commitment_loss,
             "loss": loss,
         }

@@ -6,9 +6,9 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 from src.datasets.data_utils import get_dataloaders
-from src.trainer import Trainer
+from src.trainer import SoundStreamTrainer
 from src.utils.init_utils import set_random_seed, setup_saving_and_logging
-from src.utils.train_utils import setup_trainable_model
+from src.utils.train_utils import TrainableModel
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -26,46 +26,43 @@ def main(config):
 
     set_random_seed(config.trainer.seed)
 
-    # project_config = OmegaConf.to_container(config)
-    # logger = setup_saving_and_logging(config)
-    # writer = instantiate(config.writer, logger, project_config)
+    project_config = OmegaConf.to_container(config)
+    logger = setup_saving_and_logging(config)
+    writer = instantiate(config.writer, logger, project_config)
 
-    # if config.trainer.device == "auto":
-    #     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # else:
-    #     device = config.trainer.device
+    if config.trainer.device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        device = config.trainer.device
 
-    # # setup data_loader instances
-    # # batch_transforms should be put on device
-    # dataloaders, batch_transforms = get_dataloaders(config, device)
+    # setup data_loader instances
+    # batch_transforms should be put on device
+    dataloaders, batch_transforms = get_dataloaders(config, device)
 
-    # # build model architecture, then print to console
-    # generator = setup_trainable_model(config.generator, logger, device, "generator")
-    # discriminator = setup_trainable_model(
-    #     config.discriminator, logger, device, "discriminator"
-    # )
+    # build model architecture, then print to console
+    generator = TrainableModel(config.generator, logger, device, "generator")
+    discriminator = TrainableModel(
+        config.discriminator, logger, device, "discriminator"
+    )
 
-    # # epoch_len = number of iterations for iteration-based training
-    # # epoch_len = None or len(dataloader) for epoch-based training
-    # epoch_len = config.trainer.get("epoch_len")
+    # epoch_len = number of iterations for iteration-based training
+    # epoch_len = None or len(dataloader) for epoch-based training
+    epoch_len = config.trainer.get("epoch_len")
 
-    # trainer = Trainer(
-    #     model=model,
-    #     criterion=loss_function,
-    #     metrics=metrics,
-    #     optimizer=optimizer,
-    #     lr_scheduler=lr_scheduler,
-    #     config=config,
-    #     device=device,
-    #     dataloaders=dataloaders,
-    #     epoch_len=epoch_len,
-    #     logger=logger,
-    #     writer=writer,
-    #     batch_transforms=batch_transforms,
-    #     skip_oom=config.trainer.get("skip_oom", True),
-    # )
+    trainer = SoundStreamTrainer(
+        generator=generator,
+        discriminator=discriminator,
+        config=config,
+        device=device,
+        dataloaders=dataloaders,
+        epoch_len=epoch_len,
+        logger=logger,
+        writer=writer,
+        batch_transforms=batch_transforms,
+        skip_oom=config.trainer.get("skip_oom", True),
+    )
 
-    # trainer.train()
+    trainer.train()
 
 
 if __name__ == "__main__":

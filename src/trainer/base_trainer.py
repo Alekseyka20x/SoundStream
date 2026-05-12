@@ -1,27 +1,24 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import torch
+import torch.nn as nn
 from numpy import inf
-from torch.nn.utils import clip_grad_norm_
 from tqdm.auto import tqdm
 
 from src.datasets.data_utils import inf_loop
 from src.metrics.tracker import MetricTracker
+from src.trainer.processors import BaseModelProcessor
 from src.utils.io_utils import ROOT_PATH
 
 
-class BaseTrainer:
+class BaseTrainer(ABC):
     """
     Base class for all trainers.
     """
 
     def __init__(
         self,
-        model,
-        criterion,
-        metrics,
-        optimizer,
-        lr_scheduler,
+        model_processor: BaseModelProcessor,
         config,
         device,
         dataloaders,
@@ -56,6 +53,7 @@ class BaseTrainer:
                 tensor name.
         """
         self.is_train = True
+        self.model_processor = model_processor
 
         self.config = config
         self.cfg_trainer = self.config.trainer
@@ -66,10 +64,6 @@ class BaseTrainer:
         self.logger = logger
         self.log_step = config.trainer.get("log_step", 50)
 
-        self.model = model
-        self.criterion = criterion
-        self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
         self.batch_transforms = batch_transforms
 
         # define dataloaders
@@ -116,18 +110,8 @@ class BaseTrainer:
         self.writer = writer
 
         # define metrics
-        self.metrics = metrics
-        self.train_metrics = MetricTracker(
-            *self.config.writer.loss_names,
-            "grad_norm",
-            *[m.name for m in self.metrics["train"]],
-            writer=self.writer,
-        )
-        self.evaluation_metrics = MetricTracker(
-            *self.config.writer.loss_names,
-            *[m.name for m in self.metrics["inference"]],
-            writer=self.writer,
-        )
+        self.train_metrics = MetricTracker(writer=self.writer)
+        self.evaluation_metrics = MetricTracker(writer=self.writer)
 
         # define checkpoint dir and init everything if required
 
@@ -172,7 +156,7 @@ class BaseTrainer:
 
             # print logged information to the screen
             for key, value in logs.items():
-                self.logger.info(f"    {key:15s}: {value}")
+                self.logger.info(f"    {key: 15s}: {value}")
 
             # evaluate model performance according to configured metric,
             # save best checkpoint as model_best
@@ -198,18 +182,18 @@ class BaseTrainer:
                 this epoch.
         """
         self.is_train = True
-        self.model.train()
+        self.model_processor.set_train_mode()
         self.train_metrics.reset()
         self.writer.set_step((epoch - 1) * self.epoch_len)
         self.writer.add_scalar("epoch", epoch)
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
+            batch = self.move_batch_to_device(batch)
+            batch = self.transform_batch(batch)
+
             try:
-                batch = self.process_batch(
-                    batch,
-                    metrics=self.train_metrics,
-                )
+                batch, metrics = self.model_processor.process_batch(batch, mode="train")
             except torch.cuda.OutOfMemoryError as e:
                 if self.skip_oom:
                     self.logger.warning("OOM on batch. Skipping batch.")
@@ -218,7 +202,8 @@ class BaseTrainer:
                 else:
                     raise e
 
-            self.train_metrics.update("grad_norm", self._get_grad_norm())
+            for name, value in metrics.items():
+                self.train_metrics.update(name, value)
 
             # log current results
             if batch_idx % self.log_step == 0:
@@ -228,9 +213,7 @@ class BaseTrainer:
                         epoch, self._progress(batch_idx), batch["loss"].item()
                     )
                 )
-                self.writer.add_scalar(
-                    "learning rate", self.lr_scheduler.get_last_lr()[0]
-                )
+
                 self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)
                 # we don't want to reset train metrics at the start of every epoch
@@ -261,7 +244,7 @@ class BaseTrainer:
             logs (dict): logs that contain the information about evaluation.
         """
         self.is_train = False
-        self.model.eval()
+        self.model_processor.set_eval_mode()
         self.evaluation_metrics.reset()
         with torch.no_grad():
             for batch_idx, batch in tqdm(
@@ -269,10 +252,16 @@ class BaseTrainer:
                 desc=part,
                 total=len(dataloader),
             ):
-                batch = self.process_batch(
-                    batch,
-                    metrics=self.evaluation_metrics,
+                batch = self.move_batch_to_device(batch)
+                batch = self.transform_batch(batch)
+
+                batch, metrics = self.model_processor.process_batch(
+                    batch, mode="inference"
                 )
+
+                for name, value in metrics.items():
+                    self.evaluation_metrics.update(name, value)
+
             self.writer.set_step(epoch * self.epoch_len, part)
             self._log_scalars(self.evaluation_metrics)
             self._log_batch(
@@ -373,36 +362,6 @@ class BaseTrainer:
                 )
         return batch
 
-    def _clip_grad_norm(self):
-        """
-        Clips the gradient norm by the value defined in
-        config.trainer.max_grad_norm
-        """
-        if self.config["trainer"].get("max_grad_norm", None) is not None:
-            clip_grad_norm_(
-                self.model.parameters(), self.config["trainer"]["max_grad_norm"]
-            )
-
-    @torch.no_grad()
-    def _get_grad_norm(self, norm_type=2):
-        """
-        Calculates the gradient norm for logging.
-
-        Args:
-            norm_type (float | str | None): the order of the norm.
-        Returns:
-            total_norm (float): the calculated norm.
-        """
-        parameters = self.model.parameters()
-        if isinstance(parameters, torch.Tensor):
-            parameters = [parameters]
-        parameters = [p for p in parameters if p.grad is not None]
-        total_norm = torch.norm(
-            torch.stack([torch.norm(p.grad.detach(), norm_type) for p in parameters]),
-            norm_type,
-        )
-        return total_norm.item()
-
     def _progress(self, batch_idx):
         """
         Calculates the percentage of processed batch within the epoch.
@@ -437,7 +396,7 @@ class BaseTrainer:
             mode (str): train or inference. Defines which logging
                 rules to apply.
         """
-        return NotImplementedError()
+        pass
 
     def _log_scalars(self, metric_tracker: MetricTracker):
         """
@@ -462,15 +421,11 @@ class BaseTrainer:
                 'model_best.pth'(do not duplicate the checkpoint as
                 checkpoint-epochEpochNumber.pth)
         """
-        arch = type(self.model).__name__
+        # arch = type(self.model).__name__
         state = {
-            "arch": arch,
             "epoch": epoch,
-            "state_dict": self.model.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
-            "lr_scheduler": self.lr_scheduler.state_dict(),
+            "model_processor": self.model_processor.state_dict(),
             "monitor_best": self.mnt_best,
-            "config": self.config,
         }
         filename = str(self.checkpoint_dir / f"checkpoint-epoch{epoch}.pth")
         if not (only_best and save_best):
@@ -503,27 +458,7 @@ class BaseTrainer:
         self.start_epoch = checkpoint["epoch"] + 1
         self.mnt_best = checkpoint["monitor_best"]
 
-        # load architecture params from checkpoint.
-        if checkpoint["config"]["model"] != self.config["model"]:
-            self.logger.warning(
-                "Warning: Architecture configuration given in the config file is different from that "
-                "of the checkpoint. This may yield an exception when state_dict is loaded."
-            )
-        self.model.load_state_dict(checkpoint["state_dict"])
-
-        # load optimizer state from checkpoint only when optimizer type is not changed.
-        if (
-            checkpoint["config"]["optimizer"] != self.config["optimizer"]
-            or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
-        ):
-            self.logger.warning(
-                "Warning: Optimizer or lr_scheduler given in the config file is different "
-                "from that of the checkpoint. Optimizer and scheduler parameters "
-                "are not resumed."
-            )
-        else:
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
-            self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        self.model_processor.load_state_dict(checkpoint["model_processor"])
 
         self.logger.info(
             f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"
@@ -547,7 +482,7 @@ class BaseTrainer:
             print(f"Loading model weights from: {pretrained_path} ...")
         checkpoint = torch.load(pretrained_path, self.device)
 
-        if checkpoint.get("state_dict") is not None:
-            self.model.load_state_dict(checkpoint["state_dict"])
+        if checkpoint.get("model_processor") is not None:
+            self.model_processor.load_state_dict(checkpoint["model_processor"])
         else:
-            self.model.load_state_dict(checkpoint)
+            self.model_processor.load_state_dict(checkpoint)
