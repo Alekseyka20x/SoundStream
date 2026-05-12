@@ -60,4 +60,6 @@ class CommitmentLoss(nn.Module):
     def forward(
         self, embeddings: torch.Tensor, quantized_embeddings: torch.Tensor, **batch
     ):
-        return {"loss": nn.functional.mse_loss(embeddings, quantized_embeddings)}
+        return {
+            "loss": nn.functional.mse_loss(embeddings, quantized_embeddings.detach())
+        }

@@ -90,14 +90,14 @@ class Encoder(nn.Module):
             encoder_blocks.append(EncoderBlock(N=C, S=stride))
 
         self.net = nn.Sequential(
-            CausalConv1d(kernel_size=7, in_channels=1, out_channels=C),
+            CausalConv1d(kernel_size=7, in_channels=1, out_channels=hidden_channels),
             *encoder_blocks,
             nn.ELU(),
             CausalConv1d(kernel_size=3, in_channels=C, out_channels=out_channels)
         )
 
     def forward(self, x: torch.Tensor):
-        return {"embeddings": self.net(x)}
+        return {"embeddings": self.net(x).swapaxes(-1, -2)}
 
 
 class DecoderBlock(nn.Module):
@@ -125,7 +125,7 @@ class Decoder(nn.Module):
         decoder_blocks = []
         for stride in strides:
             C //= 2
-            decoder_blocks.append(EncoderBlock(N=C, S=stride))
+            decoder_blocks.append(DecoderBlock(N=C, S=stride))
 
         self.net = nn.Sequential(
             CausalConv1d(
@@ -139,4 +139,4 @@ class Decoder(nn.Module):
         )
 
     def forward(self, x: torch.Tensor):
-        return {"reconstruction": self.net(x)}
+        return {"reconstruction": self.net(x.swapaxes(-1, -2))}
