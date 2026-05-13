@@ -1,3 +1,2 @@
-from src.metrics.example import ExampleMetric
-
+from .audio import NISQA, STOI
 from .base_metric import BaseMetric

@@ -1,1 +1,1 @@
-from src.datasets.hf_dataset import HFDataset
+from src.datasets.librispeech import LibrispeechDataset

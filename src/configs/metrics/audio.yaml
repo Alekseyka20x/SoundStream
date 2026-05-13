@@ -1,0 +1,10 @@
+train: []
+
+inference:
+  - _target_: src.metrics.STOI
+    sample_rate: 16000
+    device: "auto"
+
+  - _target_: src.metrics.NISQA
+    sample_rate: 16000
+    device: "auto"

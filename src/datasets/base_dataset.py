@@ -3,6 +3,7 @@ import random
 from typing import List
 
 import torch
+import torchaudio
 from torch.utils.data import Dataset
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,12 @@ class BaseDataset(Dataset):
     """
 
     def __init__(
-        self, index, limit=None, shuffle_index=False, instance_transforms=None
+        self,
+        index,
+        target_sample_rate: int,
+        limit=None,
+        shuffle_index=False,
+        instance_transforms=None,
     ):
         """
         Args:
@@ -38,6 +44,7 @@ class BaseDataset(Dataset):
         index = self._shuffle_and_limit_index(index, limit, shuffle_index)
         self._index: List[dict] = index
 
+        self.target_sample_rate = target_sample_rate
         self.instance_transforms = instance_transforms
 
     def __getitem__(self, ind):
@@ -57,10 +64,8 @@ class BaseDataset(Dataset):
         """
         data_dict = self._index[ind]
         data_path = data_dict["path"]
-        data_object = self.load_object(data_path)
-        data_label = data_dict["label"]
 
-        instance_data = {"data_object": data_object, "labels": data_label}
+        instance_data = {"audio": self.load_audio(data_path)}
         instance_data = self.preprocess_data(instance_data)
 
         return instance_data
@@ -71,7 +76,7 @@ class BaseDataset(Dataset):
         """
         return len(self._index)
 
-    def load_object(self, path):
+    def load_audio(self, path):
         """
         Load object from disk.
 
@@ -80,8 +85,13 @@ class BaseDataset(Dataset):
         Returns:
             data_object (Tensor):
         """
-        data_object = torch.load(path)
-        return data_object
+        audio, sample_rate = torchaudio.load(path)
+        audio = audio[:1, :]
+        if sample_rate != self.target_sample_rate:
+            audio = torchaudio.functional.resample(
+                audio, sample_rate, self.target_sample_rate
+            )
+        return audio
 
     def preprocess_data(self, instance_data):
         """
@@ -141,10 +151,6 @@ class BaseDataset(Dataset):
         for entry in index:
             assert "path" in entry, (
                 "Each dataset item should include field 'path'" " - path to audio file."
-            )
-            assert "label" in entry, (
-                "Each dataset item should include field 'label'"
-                " - object ground-truth label."
             )
 
     @staticmethod

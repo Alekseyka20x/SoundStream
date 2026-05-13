@@ -43,7 +43,7 @@ def move_batch_transforms_to_device(batch_transforms, device):
                 transforms[transform_name] = transforms[transform_name].to(device)
 
 
-def get_dataloaders(config, device):
+def get_dataloaders(config, device, logger):
     """
     Create dataloaders for each of the dataset partitions.
     Also creates instance and batch transforms.
@@ -62,13 +62,12 @@ def get_dataloaders(config, device):
     batch_transforms = instantiate(config.transforms.batch_transforms)
     move_batch_transforms_to_device(batch_transforms, device)
 
-    # dataset partitions init
-    datasets = instantiate(config.datasets)  # instance transforms are defined inside
-
     # dataloaders init
     dataloaders = {}
     for dataset_partition in config.datasets.keys():
-        dataset = datasets[dataset_partition]
+        dataset = instantiate(
+            config.datasets[dataset_partition], logger=logger
+        )  # instance transforms are defined inside
 
         assert config.dataloader.batch_size <= len(dataset), (
             f"The batch size ({config.dataloader.batch_size}) cannot "

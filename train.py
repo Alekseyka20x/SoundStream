@@ -37,13 +37,16 @@ def main(config):
 
     # setup data_loader instances
     # batch_transforms should be put on device
-    dataloaders, batch_transforms = get_dataloaders(config, device)
+    dataloaders, batch_transforms = get_dataloaders(config, device, logger)
 
     # build model architecture, then print to console
     generator = TrainableModel(config.generator, logger, device, "generator")
     discriminator = TrainableModel(
         config.discriminator, logger, device, "discriminator"
     )
+
+    metrics = instantiate(config.metrics)
+    print(metrics)
 
     # epoch_len = number of iterations for iteration-based training
     # epoch_len = None or len(dataloader) for epoch-based training
@@ -52,6 +55,7 @@ def main(config):
     trainer = SoundStreamTrainer(
         generator=generator,
         discriminator=discriminator,
+        metrics=metrics,
         config=config,
         device=device,
         dataloaders=dataloaders,

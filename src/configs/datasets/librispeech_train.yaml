@@ -1,0 +1,11 @@
+train:
+  _target_: src.datasets.LibrispeechDataset
+  split: "train-clean-100"
+  instance_transforms: ${transforms.instance_transforms.train}
+  target_sample_rate: 16000
+
+validation:
+  _target_: src.datasets.LibrispeechDataset
+  split: "test-clean"
+  instance_transforms: ${transforms.instance_transforms.inference}
+  target_sample_rate: 16000

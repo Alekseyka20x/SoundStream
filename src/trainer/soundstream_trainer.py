@@ -24,11 +24,11 @@ class SoundStreamProcessor(MultiModelProcessor):
         real_data: torch.Tensor = batch["audio"]
         metrics = {}
 
-        if mode == "train":
-            G_output = self.G.model(real_data)
-            fake_data: torch.Tensor = G_output["reconstruction"]
-            batch.update(G_output)
+        G_output = self.G.model(real_data)
+        fake_data: torch.Tensor = G_output["reconstruction"]
+        batch.update(G_output)
 
+        if mode == "train":
             # Disctiminator update
             D_output_fake_detached = self.D.model(fake_data.detach())
             D_output_real = self.D.model(real_data)
@@ -70,11 +70,9 @@ class SoundStreamProcessor(MultiModelProcessor):
             metrics.update(self.get_lr_and_make_step())
             metrics.update(self.get_grad_norm())
 
-        else:
-            raise NotImplementedError()
-
-        for metric in self.metrics[mode]:
-            metrics[metric.name] = metric(**batch)
+        with torch.no_grad():
+            for metric in self.metrics[mode]:
+                metrics[metric.name] = metric(**batch)
 
         return batch, metrics
 
@@ -84,6 +82,7 @@ class SoundStreamTrainer(BaseTrainer):
         self,
         generator: TrainableModel,
         discriminator: TrainableModel,
+        metrics: dict[str, list[BaseMetric]],
         config,
         device,
         dataloaders,
@@ -94,7 +93,7 @@ class SoundStreamTrainer(BaseTrainer):
         batch_transforms=None,
     ):
         super().__init__(
-            model_processor=SoundStreamProcessor(generator, discriminator),
+            model_processor=SoundStreamProcessor(generator, discriminator, metrics),
             config=config,
             device=device,
             dataloaders=dataloaders,
