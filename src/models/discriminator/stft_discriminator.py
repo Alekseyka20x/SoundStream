@@ -24,7 +24,9 @@ class ResidualUnit(nn.Module):
         )
 
     def forward(self, x: torch.Tensor):
-        return self.net(x) + self.skip(x)
+        skip_res = self.skip(x)
+        net_res = self.net(x)
+        return net_res[..., : skip_res.shape[-2], : skip_res.shape[-1]] + skip_res
 
 
 class STFTDiscriminator(nn.Module):

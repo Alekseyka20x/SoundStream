@@ -14,8 +14,19 @@ class STOI(BaseMetric):
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.metric = ShortTimeObjectiveIntelligibility(fs=sample_rate).to(device)
 
-    def __call__(self, audio: torch.Tensor, reconstruction: torch.Tensor, **batch):
-        return self.metric(audio, reconstruction).item()
+    def __call__(
+        self,
+        audio: torch.Tensor,
+        reconstruction: torch.Tensor,
+        pad_lengths: torch.Tensor,
+        **batch
+    ):
+        result = 0
+        for i, length in enumerate(pad_lengths):
+            result += self.metric(
+                audio[i, ..., : length.item()], reconstruction[i, ..., : length.item()]
+            ).item()
+        return result / reconstruction.shape[0]
 
 
 class NISQA(BaseMetric):
@@ -25,5 +36,10 @@ class NISQA(BaseMetric):
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.metric = NonIntrusiveSpeechQualityAssessment(fs=sample_rate).to(device)
 
-    def __call__(self, reconstruction: torch.Tensor, **batch):
-        return self.metric(reconstruction)[0].item()
+    def __call__(
+        self, reconstruction: torch.Tensor, pad_lengths: torch.Tensor, **batch
+    ):
+        result = 0
+        for i, length in enumerate(pad_lengths):
+            result += self.metric(reconstruction[i, ..., : length.item()])[0].item()
+        return result / reconstruction.shape[0]

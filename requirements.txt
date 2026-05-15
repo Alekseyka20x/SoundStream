@@ -1,8 +1,8 @@
-torch==2.5.1
-torchvision==0.20.0
-torchaudio==2.5.1
+torch==2.10.0
+torchvision==0.25.0
+torchaudio==2.10.0
 torchmetrics[audio]==1.9.0
-numpy==2.4.4
+numpy==2.0.2
 tqdm
 wget
 matplotlib

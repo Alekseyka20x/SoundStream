@@ -3,11 +3,7 @@ import torch.nn as nn
 
 
 def find_nearest(v: torch.Tensor, u: torch.Tensor):
-    dot_prod = v @ u.T
-    v_len2 = (v**2).sum(dim=1)
-    u_len2 = (u**2).sum(dim=1)
-    dists = v_len2.unsqueeze(1) - 2 * dot_prod + u_len2.unsqueeze(0)
-    return dists.argmin(dim=1)
+    return torch.cdist(v, u).argmin(dim=1)
 
 
 def kmeans_cluster_centers(vectors: torch.Tensor, n_clusters: int, max_iter: int = 300):

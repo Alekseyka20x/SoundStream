@@ -1,2 +1,2 @@
-from .discriminator_loss import DiscriminatorLoss
-from .generator_loss import GeneratorLoss
+from .adversarial_losses import AdversarialDiscriminatorLoss, AdversarialGeneratorLoss
+from .base_losses import CombinedLoss, CommitmentLoss, FeatureLoss, ReconstructionLoss

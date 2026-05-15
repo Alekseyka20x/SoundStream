@@ -8,7 +8,14 @@ defaults:
   - transforms: librispeech
   - _self_
 
+consts:
+  device: "auto"
+  sample_rate: 16000
+  div_length: 200
+
 generator:
+  max_grad_norm: 10
+
   optimizer:
     _target_: torch.optim.Adam
     lr: 1e-4
@@ -20,13 +27,31 @@ generator:
     total_iters: 0
 
   loss_function:
-    _target_: src.loss.GeneratorLoss
-    lambda_adversarial: 1
-    lambda_feature: 100
-    lambda_reconstruction: 1
-    lambda_commitment: 1
+    _target_: src.loss.CombinedLoss
+    losses:
+      - name: "loss_feature"
+        weight: 100
+        loss:
+          _target_: src.loss.FeatureLoss
+      - name: "loss_adversarial"
+        weight: 1
+        loss:
+          _target_: src.loss.AdversarialGeneratorLoss
+      - name: "loss_commitment"
+        weight: 1
+        loss:
+          _target_: src.loss.CommitmentLoss
+      - name: "loss_reconstruction"
+        weight: 0.005
+        loss:
+          _target_: src.loss.ReconstructionLoss
+          sample_rate: ${consts.sample_rate}
+          n_mels: 64
+          window_lengths: [64, 128, 256, 512, 1024, 2048]
 
 discriminator:
+  max_grad_norm: 10
+
   optimizer:
     _target_: torch.optim.Adam
     lr: 1e-4
@@ -35,20 +60,20 @@ discriminator:
   lr_scheduler:
     _target_: torch.optim.lr_scheduler.ConstantLR
     factor: 1.0
-    total_iters: 0
+    total_iters: -1
 
   loss_function:
-    _target_: src.loss.DiscriminatorLoss
+    _target_: src.loss.AdversarialDiscriminatorLoss
 
 trainer:
   log_step: 50
-  n_epochs: 100
+  n_epochs: 90
   epoch_len: 500
   device_tensors: ["audio"]
   resume_from: null
-  device: "auto"
+  device: ${consts.device}
   override: False
-  monitor: "max STOI"
+  monitor: "max validation_STOI"
   save_period: 5
   early_stop: ${trainer.n_epochs}
   save_dir: "saved"

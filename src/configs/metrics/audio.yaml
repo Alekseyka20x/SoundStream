@@ -1,10 +1,19 @@
-train: []
+train:
+  - _target_: src.metrics.Perplexity
+    codebook_size: ${generator.model.rvq.codebook_size}
+    n_quantizers: ${generator.model.rvq.n_quantizers}
+    div_length: ${consts.div_length}
 
 inference:
+  - _target_: src.metrics.Perplexity
+    codebook_size: ${generator.model.rvq.codebook_size}
+    n_quantizers: ${generator.model.rvq.n_quantizers}
+    div_length: ${consts.div_length}
+
   - _target_: src.metrics.STOI
-    sample_rate: 16000
-    device: "auto"
+    sample_rate: ${consts.sample_rate}
+    device: ${consts.device}
 
   - _target_: src.metrics.NISQA
-    sample_rate: 16000
-    device: "auto"
+    sample_rate: ${consts.sample_rate}
+    device: ${consts.device}

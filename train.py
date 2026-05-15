@@ -5,6 +5,7 @@ import torch
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
+from src.datasets.collate import collate_fn
 from src.datasets.data_utils import get_dataloaders
 from src.trainer import SoundStreamTrainer
 from src.utils.init_utils import set_random_seed, setup_saving_and_logging
@@ -37,7 +38,13 @@ def main(config):
 
     # setup data_loader instances
     # batch_transforms should be put on device
-    dataloaders, batch_transforms = get_dataloaders(config, device, logger)
+
+    dataloaders, batch_transforms = get_dataloaders(
+        config,
+        device,
+        logger,
+        lambda batch: collate_fn(batch, config.consts.div_length),
+    )
 
     # build model architecture, then print to console
     generator = TrainableModel(config.generator, logger, device, "generator")
@@ -46,7 +53,6 @@ def main(config):
     )
 
     metrics = instantiate(config.metrics)
-    print(metrics)
 
     # epoch_len = number of iterations for iteration-based training
     # epoch_len = None or len(dataloader) for epoch-based training

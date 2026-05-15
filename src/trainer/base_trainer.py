@@ -156,7 +156,7 @@ class BaseTrainer(ABC):
 
             # print logged information to the screen
             for key, value in logs.items():
-                self.logger.info(f"    {key: 15s}: {value}")
+                self.logger.info(f"    {key:15s}: {value}")
 
             # evaluate model performance according to configured metric,
             # save best checkpoint as model_best
@@ -208,9 +208,15 @@ class BaseTrainer(ABC):
             # log current results
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
+
+                loss_str = ""
+                for name, value in metrics.items():
+                    if name.startswith("loss"):
+                        loss_str += f"| {name.replace('_', ' ').title()}: {value:.6f} "
+
                 self.logger.debug(
-                    "Train Epoch: {} {} Loss: {:.6f}".format(
-                        epoch, self._progress(batch_idx), batch["loss"].item()
+                    "\nTrain Epoch: {} {} {}".format(
+                        epoch, self._progress(batch_idx), loss_str
                     )
                 )
 

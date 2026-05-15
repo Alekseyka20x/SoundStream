@@ -59,6 +59,6 @@ class MultiModelProcessor(BaseModelProcessor):
     def get_lr_and_make_step(self):
         lrs = {}
         for name, model in self._models.items():
-            lrs[name] = model.lr_scheduler.get_last_lr()[0]
+            lrs[f"lr_{name}"] = model.lr_scheduler.get_last_lr()[0]
             model.lr_scheduler.step()
         return lrs

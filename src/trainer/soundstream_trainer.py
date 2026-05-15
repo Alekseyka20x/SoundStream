@@ -1,7 +1,9 @@
 from typing import Any, Literal
 
 import torch
+import torchaudio
 
+from src.logger.utils import plot_spectrogram
 from src.metrics import BaseMetric
 from src.trainer.base_trainer import BaseTrainer
 from src.trainer.processors import MultiModelProcessor
@@ -41,6 +43,8 @@ class SoundStreamProcessor(MultiModelProcessor):
 
             self.D.optimizer.zero_grad()
             D_loss.backward()
+
+            metrics["grad_norm_discriminator"] = self.D.get_grad_norm()
             self.D.clip_grad_norm()
             self.D.optimizer.step()
 
@@ -53,6 +57,8 @@ class SoundStreamProcessor(MultiModelProcessor):
 
             self.G.optimizer.zero_grad()
             G_loss.backward()
+
+            metrics["grad_norm_generator"] = self.G.get_grad_norm()
             self.G.clip_grad_norm()
             self.G.optimizer.step()
 
@@ -68,11 +74,14 @@ class SoundStreamProcessor(MultiModelProcessor):
                 }
             )
             metrics.update(self.get_lr_and_make_step())
-            metrics.update(self.get_grad_norm())
 
         with torch.no_grad():
             for metric in self.metrics[mode]:
-                metrics[metric.name] = metric(**batch)
+                result = metric(**batch)
+                if isinstance(result, dict):
+                    metrics.update(result)
+                else:
+                    metrics[metric.name] = result
 
         return batch, metrics
 
@@ -104,5 +113,18 @@ class SoundStreamTrainer(BaseTrainer):
             batch_transforms=batch_transforms,
         )
 
+    def _log_audio(self, audio: torch.Tensor, name: str):
+        sample_rate = self.config.consts.sample_rate
+        self.writer.add_audio(name, audio, sample_rate=sample_rate)
+
+        mel_transform = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate)
+        spectogram = mel_transform(audio)
+        spectogram_image = plot_spectrogram(spectogram, name)
+        self.writer.add_image(name, spectogram_image)
+
     def _log_batch(self, batch_idx, batch, mode="train"):
-        raise NotImplementedError
+        length = batch["pad_lengths"][0]
+        audio = batch["audio"][0].detach().cpu().squeeze(0)[:length]
+        reconstruction = batch["reconstruction"][0].detach().cpu().squeeze(0)[:length]
+        self._log_audio(audio, "original")
+        self._log_audio(reconstruction, "reconstruction")

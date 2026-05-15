@@ -14,12 +14,14 @@ class SoundStream(nn.Module):
 
     def forward(self, x):
         embeddings = self.encoder(x)["embeddings"]
-        quantized_embeddings = self.rvq(embeddings)["quantized_embeddings"]
+        rvq_output = self.rvq(embeddings)
+        quantized_embeddings = rvq_output["quantized_embeddings"]
         reconstruction = self.decoder(quantized_embeddings)["reconstruction"]
         return {
             "embeddings": embeddings,
             "quantized_embeddings": quantized_embeddings,
             "reconstruction": reconstruction,
+            "codebook_indices": rvq_output["codebook_indices"],
         }
 
     @torch.inference_mode()
