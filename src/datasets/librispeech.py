@@ -21,11 +21,13 @@ class LibrispeechDatasetSplit:
         logger: Logger,
         dataset_dir: Optional[str] = None,
         save_meta_info: bool = False,
+        save_index: bool = True,
     ):
         self.split = split
         self.split_dir = Path(dataset_dir) / split
         self.save_meta_info = save_meta_info
         self.logger = logger
+        self.save_index = save_index
 
     def _download(self):
         tar_path = self.split_dir / f"{self.split}.tar.gz"
@@ -53,12 +55,13 @@ class LibrispeechDatasetSplit:
             for file in files:
                 if file.endswith(".flac"):
                     index.append({"path": str(self.split_dir / path / file)})
-        with open(self.split_dir / "index.json", "w") as f:
-            json.dump(index, f, indent=2)
+        if self.save_index:
+            with open(self.split_dir / "index.json", "w") as f:
+                json.dump(index, f, indent=2)
         return index
 
     def get_index(self):
-        self.logger.info(f"Loading split {self.split}")
+        self.logger.info(f"Loading split '{self.split}'")
 
         if not self.split_dir.exists():
             self.split_dir.mkdir(parents=True, exist_ok=True)
@@ -67,7 +70,7 @@ class LibrispeechDatasetSplit:
         index_path = self.split_dir / "index.json"
         if not index_path.exists():
             self.logger.info("Creating index")
-            self._create_index()
+            return self._create_index()
 
         with open(index_path, "r") as f:
             return json.load(f)
@@ -79,6 +82,7 @@ class LibrispeechDataset(BaseDataset):
         split: str | list[str],
         logger: Logger,
         dataset_dir: Optional[str] = None,
+        save_index: bool = True,
         *args,
         **kwargs,
     ):
@@ -95,6 +99,7 @@ class LibrispeechDataset(BaseDataset):
                 logger=logger,
                 dataset_dir=self.dataset_dir,
                 save_meta_info=True,
+                save_index=save_index,
             )
             for split in split
         ]

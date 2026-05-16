@@ -4,6 +4,8 @@ train:
   instance_transforms: ${transforms.instance_transforms.train}
   target_sample_rate: ${consts.sample_rate}
   limit: ${dataloader.batch_size}
+  dataset_dir: null
+  save_index: True
 
 validation:
   _target_: src.datasets.LibrispeechDataset
@@ -11,3 +13,5 @@ validation:
   instance_transforms: ${transforms.instance_transforms.inference}
   target_sample_rate: ${consts.sample_rate}
   limit: ${dataloader.batch_size}
+  dataset_dir: null
+  save_index: True

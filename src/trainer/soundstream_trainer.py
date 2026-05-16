@@ -2,6 +2,8 @@ from typing import Any, Literal
 
 import torch
 import torchaudio
+from torch.amp.autocast_mode import autocast
+from torch.amp.grad_scaler import GradScaler
 
 from src.logger.utils import plot_spectrogram
 from src.metrics import BaseMetric
@@ -16,24 +18,33 @@ class SoundStreamProcessor(MultiModelProcessor):
         generator: TrainableModel,
         discriminator: TrainableModel,
         metrics: dict[str, list[BaseMetric]],
+        device: str,
+        use_amp: bool,
     ):
         super().__init__({"generator": generator, "discriminator": discriminator})
         self.G = generator
         self.D = discriminator
         self.metrics = metrics
+        self.device = device
+        self.use_amp = use_amp
+        self.G_grad_scaler = GradScaler(device, enabled=self.use_amp)
+        self.D_grad_scaler = GradScaler(device, enabled=self.use_amp)
 
     def process_batch(self, batch: dict[str, Any], mode: Literal["train", "inference"]):
         real_data: torch.Tensor = batch["audio"]
         metrics = {}
 
-        G_output = self.G.model(real_data)
-        fake_data: torch.Tensor = G_output["reconstruction"]
+        with autocast(self.device, enabled=self.use_amp):
+            G_output = self.G.model(real_data)
+        fake_data: torch.Tensor = G_output["reconstruction"].float()
+        G_output["reconstruction"] = fake_data
         batch.update(G_output)
 
         if mode == "train":
             # Disctiminator update
-            D_output_fake_detached = self.D.model(fake_data.detach())
-            D_output_real = self.D.model(real_data)
+            with autocast(self.device, enabled=self.use_amp):
+                D_output_fake_detached = self.D.model(fake_data.detach())
+                D_output_real = self.D.model(real_data)
             D_loss = self.D.loss_function(
                 discriminator_output_real=D_output_real,
                 discriminator_output_fake=D_output_fake_detached,
@@ -42,25 +53,28 @@ class SoundStreamProcessor(MultiModelProcessor):
             batch["discriminator_output_real"] = D_output_real
 
             self.D.optimizer.zero_grad()
-            D_loss.backward()
-
+            self.D_grad_scaler.scale(D_loss).backward()
+            self.D_grad_scaler.unscale_(self.D.optimizer)
             metrics["grad_norm_discriminator"] = self.D.get_grad_norm()
             self.D.clip_grad_norm()
-            self.D.optimizer.step()
+            self.D_grad_scaler.step(self.D.optimizer)
+            self.D_grad_scaler.update()
 
             # Generator update
-            D_output_fake = self.D.model(fake_data)
+            with autocast(self.device, enabled=self.use_amp):
+                D_output_fake = self.D.model(fake_data)
             batch["discriminator_output_fake"] = D_output_fake
 
             G_losses = self.G.loss_function(**batch)
             G_loss = G_losses["loss"]
 
             self.G.optimizer.zero_grad()
-            G_loss.backward()
-
+            self.G_grad_scaler.scale(G_loss).backward()
+            self.G_grad_scaler.unscale_(self.G.optimizer)
             metrics["grad_norm_generator"] = self.G.get_grad_norm()
             self.G.clip_grad_norm()
-            self.G.optimizer.step()
+            self.G_grad_scaler.step(self.G.optimizer)
+            self.G_grad_scaler.update()
 
             metrics.update(
                 {
@@ -100,9 +114,16 @@ class SoundStreamTrainer(BaseTrainer):
         epoch_len=None,
         skip_oom=True,
         batch_transforms=None,
+        use_amp=True,
     ):
         super().__init__(
-            model_processor=SoundStreamProcessor(generator, discriminator, metrics),
+            model_processor=SoundStreamProcessor(
+                generator=generator,
+                discriminator=discriminator,
+                metrics=metrics,
+                device=device,
+                use_amp=use_amp,
+            ),
             config=config,
             device=device,
             dataloaders=dataloaders,

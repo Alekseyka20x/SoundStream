@@ -14,7 +14,7 @@ consts:
   div_length: 200
 
 generator:
-  max_grad_norm: 10
+  max_grad_norm: 1000
 
   optimizer:
     _target_: torch.optim.Adam
@@ -42,7 +42,7 @@ generator:
         loss:
           _target_: src.loss.CommitmentLoss
       - name: "loss_reconstruction"
-        weight: 0.005
+        weight: 0.001
         loss:
           _target_: src.loss.ReconstructionLoss
           sample_rate: ${consts.sample_rate}
@@ -50,7 +50,7 @@ generator:
           window_lengths: [64, 128, 256, 512, 1024, 2048]
 
 discriminator:
-  max_grad_norm: 10
+  max_grad_norm: 100
 
   optimizer:
     _target_: torch.optim.Adam
@@ -73,8 +73,9 @@ trainer:
   resume_from: null
   device: ${consts.device}
   override: False
-  monitor: "max validation_STOI"
+  monitor: "max validation_NISQA"
   save_period: 5
   early_stop: ${trainer.n_epochs}
   save_dir: "saved"
   seed: 1
+  use_amp: True
