@@ -18,3 +18,5 @@ decoder:
   in_channels: 128
   hidden_channels: 32
   strides: [5, 5, 4, 2]
+
+target_sample_rate: ${consts.sample_rate}

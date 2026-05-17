@@ -6,6 +6,7 @@ numpy==2.0.2
 tqdm
 wget
 matplotlib
+gdown
 pandas
 wandb
 comet_ml
