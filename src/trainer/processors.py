@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Literal
 
+import torch.nn as nn
+
 from src.utils.train_utils import TrainableModel
 
 
@@ -62,3 +64,20 @@ class MultiModelProcessor(BaseModelProcessor):
             lrs[f"lr_{name}"] = model.lr_scheduler.get_last_lr()[0]
             model.lr_scheduler.step()
         return lrs
+
+
+class InferenceModelProcessor(BaseModelProcessor):
+    def __init__(self, model: nn.Module):
+        self.model = model
+
+    def set_train_mode(self):
+        self.model.train()
+
+    def set_eval_mode(self):
+        self.model.eval()
+
+    def state_dict(self):
+        raise NotImplementedError()
+
+    def load_state_dict(self, checkpoint):
+        raise NotImplementedError()

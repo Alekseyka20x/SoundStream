@@ -1,13 +1,16 @@
+import logging
 import warnings
 
 import hydra
 import torch
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 
+from src.datasets.collate import collate_fn
 from src.datasets.data_utils import get_dataloaders
-from src.trainer import Inferencer
+from src.logger import setup_logging
+from src.trainer import SoundStreamInferencer
 from src.utils.init_utils import set_random_seed
-from src.utils.io_utils import ROOT_PATH
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -24,6 +27,11 @@ def main(config):
     """
     set_random_seed(config.inferencer.seed)
 
+    logger = setup_logging()
+
+    project_config = OmegaConf.to_container(config)
+    writer = instantiate(config.writer, logger, project_config)
+
     if config.inferencer.device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     else:
@@ -31,28 +39,29 @@ def main(config):
 
     # setup data_loader instances
     # batch_transforms should be put on device
-    dataloaders, batch_transforms = get_dataloaders(config, device)
+    dataloaders, batch_transforms = get_dataloaders(
+        config,
+        device,
+        logger,
+        lambda batch: collate_fn(batch, config.consts.div_length),
+    )
 
     # build model architecture, then print to console
     model = instantiate(config.model).to(device)
-    print(model)
+    logger.info("Model was successfully loaded")
 
     # get metrics
     metrics = instantiate(config.metrics)
 
-    # save_path for model predictions
-    save_path = ROOT_PATH / "data" / "saved" / config.inferencer.save_path
-    save_path.mkdir(exist_ok=True, parents=True)
-
-    inferencer = Inferencer(
+    inferencer = SoundStreamInferencer(
         model=model,
         config=config,
         device=device,
         dataloaders=dataloaders,
         batch_transforms=batch_transforms,
-        save_path=save_path,
+        save_path=None,
+        writer=writer,
         metrics=metrics,
-        skip_model_load=False,
     )
 
     logs = inferencer.run_inference()
